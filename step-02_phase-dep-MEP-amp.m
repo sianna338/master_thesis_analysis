@@ -145,9 +145,10 @@ for isub=1:length(subjects)
     % extract min and max points for for the time window from 0.015-0.05 after
     % TMS pulse
     for i = 1:numel(data_MEPs.trial)
-        min_val = min(data_MEPs.trial{i}(1,:));
+        [min_val, idx_min] = min(data_MEPs.trial{i}(1,:));
         max_val = max(data_MEPs.trial{i}(1,:));
         data_MEPs.mep(i,1) = abs(min_val) + abs(max_val);
+        data_MEPs.latency(i,1) = data_MEPs.time{i}(1,idx_min)
     end
     save([datapath, filesep, subjects{isub}, filesep, session{isub}, filesep,'data_MEPs_', subjects{isub}, '_', session{isub}], 'data_MEPs', '-v7.3');
 end
@@ -238,34 +239,6 @@ for isub=1:numel(subjects)
 end
 
 
-%% this does not work
-data_MEPs_conds = [];
-MEPs_one_subject = [];
-conditions_one_subject = [];
-data_normalized_blocks = [];
-for isub = 1:numel(subjects)
-    load([datapath, filesep, subjects{isub}, filesep, session{isub}, filesep,'data_MEPs_', subjects{isub},  '_', session{isub}]);
-    MEPs_one_subject{isub} = data_MEPs.mep
-    conditions_one_subject{isub} = data_MEPs.trialinfo
-    data_MEPs_conds = [MEPs_one_subject{isub}, conditions_one_subject{isub}]
-    blocks = [1:19:length(data_MEPs.mep)-19] % load data MEPs before and put length here
-    for iblock = 1:length(blocks)
-        [conditions_counts{iblock},condition_num{iblock}] = groupcounts(data_MEPs_conds(blocks(iblock):(blocks(iblock)+19),2));
-
-        % get mean for each block
-        mean_MEP_block{iblock} = nanmean(data_MEPs_conds(blocks(iblock):(blocks(iblock)+19),1))
-
-        % get percent change from mean MEP amplitude for that subject
-        data_normalized_blocks{iblock} = ((data_MEPs_conds(blocks(iblock):blocks(iblock)+19,1)-mean_MEP_block{iblock})./mean_MEP_block{iblock})*100 
-    end
-    % calculate z-scores and remove outliers if needed
-    data_MEPs_conds(:,3) = (data_MEPs_conds(:,1)-nanmean(data_MEPs_conds(:,1)))/nanstd(data_MEPs_conds(:,1))
-    % threshold = 1.7;
-    % non_outliers = (abs(data_MEPs_conds(:,3)) < threshold)
-    data_MEPs_conds_normalized{isub} = vertcat(data_normalized_blocks{:})
-    save([datapath, filesep, subjects{isub}, filesep, session{isub}, 'data_MEPs_conds_', subjects{isub}], 'data_MEPs_conds', '-v7.3')
-end
-
 %% normalize MEPs per block for each subject
 data_MEPs_conds_normalized = cell(numel(subjects), 1);
 
@@ -304,7 +277,9 @@ end
 
 %%
 % create  overview of MEPs from all subjects
-subjects_all = {'sub-09', 'sub-06', 'sub-02'}
+subjects = {'sub-09', 'sub-09', 'sub-06', 'sub-02', 'sub-03'}
+session = {'ses-exp', 'ses-exp-02', 'ses-exp', 'ses-exp', 'ses-exp'}
+subjects_all = {'sub-09', 'sub-06', 'sub-02', 'sub-03'}
 data_MEPs = [];
 group = []; 
 for isub = 1:numel(subjects)
@@ -363,18 +338,19 @@ box on;
 colormap(ax, jet)
 
 figure; 
-plot(MEP_avg_normalized.Condition, MEP_avg_normalized.Median_MEP, 'ok', 'MarkerFaceColor','k','MarkerSize', 8)
-errorbar(MEP_avg_normalized.Condition, MEP_avg_normalized.Median_MEP, SD_MEP, 'ok', 'MarkerFaceColor', 'k', 'LineWidth', 1, 'Color', [0.5 0.5 0.5]);
-title(['Median MEP amplitudes normalized'], 'FontWeight', 'bold');
-xlabel('conditions', 'FontWeight', 'bold');
-ylabel('median MEP amplitude (microvolt)', 'FontWeight', 'bold');
-xticklabels({'peak', '', 'falling', '', 'trough', '', 'rising', '', 'free'})
-set(gca, 'FontSize', 12, 'FontName', 'Arial');
+plot(MEP_avg_norm.Condition, MEP_avg_norm.Median_MEP, 'ok', 'MarkerFaceColor','k','MarkerSize', 8); hold on;
+errorbar(MEP_avg_norm.Condition, MEP_avg_norm.Median_MEP, MEP_avg_norm.SD_MEP, 'ok', 'MarkerFaceColor', 'k', 'LineWidth', 1, 'Color', [0.5 0.5 0.5]); hold on;
+title(['Median MEP amplitudes normalized (blockwise)'], 'FontWeight', 'bold');
+ax = gca
+ax.XAxis.Categories={'peak' 'falling' 'trough' 'rising' 'free'};
+xlabel(ax,'conditions', 'FontWeight', 'bold');
+ylabel(ax,'MEP amplitude (percent chhange from block mean)', 'FontWeight', 'bold');
+set(ax, 'FontSize', 12, 'FontName', 'Arial');
 grid on; 
-set(gca, 'GridLineStyle', '--', 'GridColor', [0.6 0.6 0.6], 'GridAlpha', 0.7);
-pbaspect([1.5 1 1]); 
+set(ax, 'GridLineStyle', '--', 'GridColor', [0.6 0.6 0.6], 'GridAlpha', 0.7);
+pbaspect([1.5 1 1])
 box on;
-colormap(jet)
+colormap(ax, jet)
 
 % raw MEPs
 [conditions_counts,condition_num] = groupcounts(data_MEPs_all(:,2)) 
